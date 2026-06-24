@@ -16,7 +16,7 @@ import pandas as pd
 import yfinance as yf
 
 __all__ = [
-    "fetch_prices", "fetch_macro", "align_macro", "save", "load",
+    "asx200_tickers", "fetch_prices", "fetch_macro", "align_macro", "save", "load",
     "simple_returns", "log_returns",
     "annualized_return", "annualized_vol", "sharpe", "max_drawdown", "summarize",
     "equal_weight", "ma_crossover", "momentum_portfolio",
@@ -28,6 +28,21 @@ __all__ = [
 # Data
 # --------------------------------------------------------------------------- #
 
+def asx200_tickers():
+    """Fetch current ASX 200 tickers from Wikipedia, formatted for Yahoo (.AX)."""
+    import urllib.request, io
+    url = "https://en.wikipedia.org/wiki/S%26P/ASX_200"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    html = urllib.request.urlopen(req).read()
+    tables = pd.read_html(io.BytesIO(html))
+    for t in tables:
+        cols = {str(c).strip().lower(): c for c in t.columns}
+        if "code" in cols:
+            codes = t[cols["code"]].astype(str).str.strip()
+            return [f"{c}.AX" for c in codes if c and c.lower() != "nan"]
+    raise ValueError("Couldn't find the ticker column on the page")
+
+
 def fetch_prices(tickers, start, end=None):
     """Download split/dividend-adjusted daily closes. One column per ticker."""
     raw = yf.download(tickers, start=start, end=end, auto_adjust=True, progress=False)
@@ -35,7 +50,6 @@ def fetch_prices(tickers, start, end=None):
     if isinstance(close, pd.Series):
         close = close.to_frame()
     return close.dropna(how="all")
-
 
 def fetch_macro(series_map, api_key, start):
     """Download FRED series. Returns None if no api_key. series_map: name -> code."""
